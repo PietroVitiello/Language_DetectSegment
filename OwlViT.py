@@ -56,16 +56,21 @@ class OWL_ViT(nn.Module):
 
 if __name__ == "__main__":
     from utils import draw_bounding_boxes, open_image
-    owl = OWL_ViT()
+    import sys
+
+    image_number = sys.argv[1]
+    image_dir = "/home/pita/Documents/PhD/OwlViT/fixed_present/head_camera_rgb_"
+    image_dir += f"{image_number}.png"
+    image = open_image(image_dir)
+    # image.show()
+
+    text = [sys.argv[2]]
 
     # url = "http://images.cocodataset.org/val2017/000000039769.jpg"
     # image = Image.open(requests.get(url, stream=True).raw)
-    image = open_image("/home/pita/Downloads/MicrosoftTeams-image.png")
-    image.show()
-
     # text = ["cat", "a photo of a remote"]
-    text = ["toaster"]
 
+    owl = OWL_ViT()
     x = {
         "texts": text,
         "image": image,
