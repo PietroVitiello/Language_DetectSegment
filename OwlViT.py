@@ -2,16 +2,20 @@ import requests
 from PIL import Image
 import torch
 import torch.nn as nn
+import numpy as np
 
 from transformers import OwlViTProcessor, OwlViTForObjectDetection
 
 class OWL_ViT(nn.Module):
 
-    def __init__(self) -> None:
+    def __init__(self, device: str ='cpu') -> None:
         super().__init__()
 
         self.processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
         self.model = OwlViTForObjectDetection.from_pretrained("google/owlvit-base-patch32")
+        self.model.to(device=device)
+        self.model.eval()
+        self.device = device
 
     def get_complete_results(self, x: dict):
         texts = [x["texts"]]
@@ -27,20 +31,19 @@ class OWL_ViT(nn.Module):
         return self.processor.post_process(outputs=outputs, target_sizes=target_sizes)
 
     def forward(self, x: dict):
-        texts = [x["texts"]]
-        inputs = self.processor(text=texts, images=x["image"], return_tensors="pt")
+        if len(x["images"].shape) == 3:
+            x["images"] = np.expand_dims(x["images"], 0)
+            texts = [x["texts"]]
+        inputs = self.processor(text=texts, images=x["images"], return_tensors="pt")
+        inputs.to(device=self.device)
         outputs = self.model(**inputs)
-
-        # Target image sizes (height, width) to rescale box predictions [batch_size, 2]
-        # print(outputs)
-
-        target_sizes = torch.Tensor([x["image"].size[::-1]])
+        target_sizes = torch.tensor([x["images"].shape[1:-1]], device=self.device)
 
         # Convert outputs (bounding boxes and class logits) to COCO API
         results = self.processor.post_process(outputs=outputs, target_sizes=target_sizes)[0]
         all_boxes, all_scores, all_labels = results["boxes"].detach(), results["scores"].detach(), results["labels"].detach()
 
-        best_bboxes = torch.zeros((len(x["texts"]), 4), dtype=torch.int16)
+        best_bboxes = torch.zeros((len(x["texts"]), 4), dtype=torch.int16, device=self.device)
 
         for object_id in range(len(x["texts"])):
             boxes = all_boxes[all_labels==object_id]
@@ -58,38 +61,42 @@ if __name__ == "__main__":
     from utils import draw_bounding_boxes, open_image
     import sys
 
-    image_number = sys.argv[1]
-    image_dir = "/home/pita/Documents/PhD/OwlViT/fixed_present/head_camera_rgb_"
-    image_dir += f"{image_number}.png"
-    image = open_image(image_dir)
-    # image.show()
+    if len(sys.argv) > 1:
 
-    text = [sys.argv[2]]
+        image_number = sys.argv[1]
+        # image_dir = "/home/pita/Documents/PhD/OwlViT/fixed_present/head_camera_rgb_"
+        image_dir = "/home/pita/Documents/Projects/OwlViT/fixed_present/head_camera_rgb_"
+        image_dir += f"{image_number}.png"
+        image = open_image(image_dir)
 
-    # url = "http://images.cocodataset.org/val2017/000000039769.jpg"
-    # image = Image.open(requests.get(url, stream=True).raw)
-    # text = ["cat", "a photo of a remote"]
+        text = [sys.argv[2]]
 
-    owl = OWL_ViT()
-    x = {
-        "texts": text,
-        "image": image,
-    }
+        # url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+        # image = Image.open(requests.get(url, stream=True).raw)
+        # text = ["cat", "a photo of a remote"]
 
-    # results = owl.get_complete_results(x)
+        owl = OWL_ViT()
+        x = {
+            "texts": text,
+            "images": np.array(image),
+        }
 
-    # print(results)
+        # results = owl.get_complete_results(x)
 
-    # i = 0  # Retrieve predictions for the first image for the corresponding text queries
-    # boxes, scores, labels = results[i]["boxes"], results[i]["scores"], results[i]["labels"]
+        # print(results)
 
-    # score_threshold = 0.1
-    # for box, score, label in zip(boxes, scores, labels):
-    #     box = [round(i, 2) for i in box.tolist()]
-    #     if score >= score_threshold:
-    #         print(f"Detected {text[label]} with confidence {round(score.item(), 3)} at location {box}")
+        # i = 0  # Retrieve predictions for the first image for the corresponding text queries
+        # boxes, scores, labels = results[i]["boxes"], results[i]["scores"], results[i]["labels"]
 
-    bboxes = owl(x)
+        # score_threshold = 0.1
+        # for box, score, label in zip(boxes, scores, labels):
+        #     box = [round(i, 2) for i in box.tolist()]
+        #     if score >= score_threshold:
+        #         print(f"Detected {text[label]} with confidence {round(score.item(), 3)} at location {box}")
 
-    draw_bounding_boxes(image, bboxes)
-    image.show()
+        bboxes = owl(x)
+
+        draw_bounding_boxes(image, bboxes)
+        image.show()
+    else:
+        owl = OWL_ViT()
