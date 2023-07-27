@@ -1,4 +1,4 @@
-# Language_Owl-ViT
+# Language Conditioned Object Detection and Segmentation
 Pipeline to automatically segment target objects in an image based on a language command.
 
 # Installation
