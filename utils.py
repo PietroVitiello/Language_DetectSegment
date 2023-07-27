@@ -11,9 +11,10 @@ def open_image_numpy(path):
     return np.array(image)
 
 def draw_bounding_boxes(image, bbox):
-    bbox = [(bbox[0], bbox[1]), (bbox[2], bbox[3])]
-    img1 = ImageDraw.Draw(image)  
-    img1.rectangle(bbox, outline ="red", width=4)
+    for object_id in range(bbox.shape[0]):
+        bbox = [(bbox[object_id, 0], bbox[object_id, 1]), (bbox[object_id, 2], bbox[object_id, 3])]
+        img1 = ImageDraw.Draw(image)  
+        img1.rectangle(bbox, outline ="red", width=4)
 
 def draw_mask(image, mask, random_color=True):
     if random_color:
